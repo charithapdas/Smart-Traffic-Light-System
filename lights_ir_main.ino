@@ -8,12 +8,12 @@
 
 #define ARRAY_SIZE(array) ((sizeof(array))/(sizeof(array[0])))
 #define modeSwitch1 27
-#define modeSwitch2 37
+#define modeSwitch2 38
 #include <LiquidCrystal.h>
 
 LiquidCrystal lcd(28, 29, 30, 31, 32, 33);
 
-//don't use equal traffic densities maximum is 7 minimum is 1
+//don't use equal traffic densities | maximum is 7, minimum is 1
 //4 pins to Read green lights status
 //add buttons to seprate functions
 
@@ -35,9 +35,11 @@ const byte greenLight[4] = {light[0][2], light[1][2], light[2][2], light[3][2]};
 // 22 common A IR sensors
 // 23, 24, 25, 26 othet B IR sensors
 const byte irSensors[5] = {22, 23, 24, 25, 26};
+const byte rfReceiver[4] = {34, 35, 36, 37};
 int laneSeq[4];
 int laneSeq2[4];
 byte vehicles[5];
+byte stayEmg = 0;
 byte workMode = 1;
 const byte commonDelay = 100;
 boolean enterVehicle[4] = {false, false, false, false};
@@ -61,6 +63,10 @@ void setup() {
   //set IR sensors
   for (byte i = 0; i < ARRAY_SIZE(irSensors); i++) {
     pinMode(irSensors[i], INPUT);
+  }
+
+  for (byte i = 0; i < ARRAY_SIZE(rfReceiver); i++) {
+    pinMode(rfReceiver[i], OUTPUT);
   }
 
   lcd.setCursor(1, 0);
@@ -159,10 +165,10 @@ void loop() {
           delay(1000);
           on_off_Y_Lights((byte)laneSeq2[i], (byte)laneSeq2[i + 1], 0);
         } else {
-            digitalWrite(light[laneSeq2[i]][1], 1);
-            delay(1000);
-            digitalWrite(light[laneSeq2[i]][1], 0);
-          }
+          digitalWrite(light[laneSeq2[i]][1], 1);
+          delay(1000);
+          digitalWrite(light[laneSeq2[i]][1], 0);
+        }
       }
       Serial.println("-------------return to Mode 1--------------");
       workMode = 1;
@@ -175,15 +181,28 @@ void loop() {
   else if (workMode == 4) {
     lcd.clear();
     lcd.setCursor(5, 0);
-    lcd.print("Mode 4");
+    lcd.print("Mode 3");
     delay(2000);
     lcd.clear();
+    
     initCursor();
-
     nom = "NL";
     modeOneCursor(nom);
 
+    on_off_RG_Lights(1, 1);
+    //emg code
+    for (byte i = 1; i < ARRAY_SIZE(rfReceiver); i++) {
+      if(rfReceiver[i]==HIGH){
+          stayEmg = i+1;
+          
+          
+      }
+    }
+    on_off_RG_Lights(1, 0);
+    //work as fixted time + particular road
     
+
+
   }
 
 }
@@ -201,8 +220,8 @@ void on_off_RG_Lights(byte onLight_Lane, byte mode) {
 
 //Turn On Off Yellow lights
 void on_off_Y_Lights(byte lane1, byte lane2, byte mode) {
-  digitalWrite(light[lane1-1][1], mode);
-  digitalWrite(light[lane2-1][1], mode);
+  digitalWrite(light[lane1 - 1][1], mode);
+  digitalWrite(light[lane2 - 1][1], mode);
   Serial.println("------------------Yellow------------------");
 }
 
@@ -248,8 +267,8 @@ void count_vehicle() {
     // !!!!! take the first condition IR sensor sends value HIGH !!!!!
 
     if ((digitalRead(irSensors[i])) == HIGH) {
-      if (enterVehicle[i] == false) {
-        enterVehicle[i] = true;
+      if (enterVehicle[i-1] == false) {
+        enterVehicle[i-1] = true;
         vehicles[i]++;  // works with B IR sensors
         Serial.print("lane ");
         Serial.print(i);
@@ -261,7 +280,7 @@ void count_vehicle() {
       }
     }
     if ((digitalRead(irSensors[i])) == LOW) {
-      enterVehicle[i] = false;
+      enterVehicle[i-1] = false;
     }
     if (digitalRead(greenLight[i - 1]) == HIGH && (digitalRead(irSensors[0])) == HIGH) {
       if (greenLightPass == false) {
@@ -354,6 +373,3 @@ void displayVehNo(byte i) {
   }
   lcd.print(vehicles[i]);
 }
-
-
-
